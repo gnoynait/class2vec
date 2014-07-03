@@ -14,21 +14,34 @@ typedef long long code_t;
     vector<int> words;
 };
 */
-unordered_map<code_t, int> code_index;
-unordered_map<string, int> word_count; // count each number for filter words
+// map code to its index in the syn1
+unordered_map<string, int> code_index;
+// the parent node's index
+int *parent_index;
+// map vocab word to its index in the syn0
 unordered_map<string, int> vocab_index;
-int latest_code_index = 0;
+//int latest_code_index = 0;
+// the size of each vector
 int vec_size = 100;
+// how many vocab word in the table
 int vocab_size;
+// how many class
 int class_num;
+// if a word appears less than min_word_count, it will be ignored
 int min_word_count = 20;
+// syn0: vector table for word
+// syn1: vector table for class
+// neu:  vecotr for middle sum unit
+// eneu: error vector for middle sum unit
 float *syn0, *syn1, *neu, *eneu;
+// for fast compute 1/(1 + exp(x))
 float *expTable;
 clock_t start;
+// inital parameter changing step
 float starting_alpha = 0.025;
 // read a word from fin
 // return: 0 if '\n'
-//         1 if read a word
+//         len if read a word
 //        -1 if end of file
 int read_word(FILE *fin, char *buffer) {
     if (feof(fin)) return -1;
@@ -46,33 +59,48 @@ int read_word(FILE *fin, char *buffer) {
         }
     }
     buffer[len] = '\0';
-    return 1;
+    return len;
 }
+
 void learn_vocab(FILE *train_file) {
-    int index = 0;
+    int word_next_index = 0;
+    int code_next_index = 0;
     fseek(train_file, 0, SEEK_SET);
     char word[MAX_WORD_LEN];
-    int status;
+    int word_len;
+    
+    unordered_map<string, int> word_count; // count each number for filter words
+    unordered_set<string> codes;
     int new_record = 1;
-    while((status = read_word(train_file, word)) != -1) {
-        // TODO
-        if (status == 0) {
+    while((word_len = read_word(train_file, word)) != -1) {
+        if (word_len == 0) {
             new_record = 1;
         } else {
+            if (new_record) {
+                codes.insert(word);
+                while (code_index.count(word) == 0 && word_len > 0) {
+                    code_index[word] = code_next_index++;
+                    word[--word_len] = '\0';
+                }
+                new_record = 0;
+            }
             word_count[word]++;
-            new_record = 0;
         }
     }
     for (auto it = word_count.begin(); it != word_count.end(); ++it) {
-        if (it->second > min_word_count) {
+        if (it->second >= min_word_count) {
             vocab_index[it->first] = index;
             ++index;
         }
     }
+    class_num = codes.size();
+    for (auto it = codes.begin(); it != codes.end(); ++it) {
+        //TODO
+    }
+    
 }
 
 void init_net() {
-
     syn0 = new float[vec_size * vocab_size];
     syn1 = new float[vec_size * class_num * 2 - 1]();
     neu = new float[vec_size];
@@ -97,6 +125,7 @@ void init_net() {
         }
     }
 }
+/*
 int read_record(FILE *fin, int *codes, int *nodes, 
     int *words, int &len_codes, int &len_words) {
 
@@ -148,6 +177,33 @@ int read_record(FILE *fin, int *codes, int *nodes,
     }
     return 1;
 }
+*/
+int read_record(FILE *fin, int *codes, int *nodes, 
+    int *words, int &len_codes, int &len_words) {
+    char buffer[MAX_WROD_LEN];
+    len_codes = 0;
+    len_words = 0;
+    int len;
+    int read_code = 1;
+    while ((len = read_word(fin, buffer)) != -1) {
+        if (len == 0) {
+            break;
+        }
+        if (read_code) {
+            for (int i = 0; i < len; ++i) {
+                assert(buffer[i] == '0' || buffer[i] == '1');
+                codes[i] = buffer[i] - '0';
+            }
+            len_codes = len;
+            read_code = 0;
+        } else {
+            if (word_index.count(buffer) > 0) {
+                words[len_words++] = word_index[buffer];
+            }
+        }
+    }
+    return len_codes > 0;
+}
 void train_model(FILE *train_file) {
     int codes[MAX_CODE_LEN];
     int nodes[MAX_CODE_LEN];
@@ -191,17 +247,18 @@ void train_model(FILE *train_file) {
 }
 
 void save_model(FILE *vocab_vec_file, FILE *class_vec_file) {
-    for (int v = 0; v < vocab_size; ++v) {
+    for (auto it = word_index.begin(); it != word_index.end(); ++it) {
+        fprintf (vocab_vec_file, "%s\t", it->first.cstr());
         for (int i = 0; i < vec_size; ++i) {
             char sep = i == vec - 1 ? '\n' : ' ';
-            printf ("%f", syn0[v * vec_size + i]);
-            fprintf(vocab_vec_file, "%f%c", sep);
+            fprintf(vocab_vec_file, "%f%c", syn0[it->second * vec_size + i], sep);
         }
     }
     for (unordered_map<code_t, int>::iterator it = code_index.begin(); it != code_index.end(); ++it) {
-        code_t code = it->code;
-        int index = it->index;
-        // TODO not easy to implement
+       fprintf(class_vec_file, "%s\t", it->first.cstr()); 
+       for (int i = 0; i < vec_size; ++i) {
+           char sep = i == vec - 1 ? '\n' : ' ';
+           fprintf(class_vec_file, "%f%c", syn1[it->second * vec_siez + i], sep);
     }
 }
 int main () {
