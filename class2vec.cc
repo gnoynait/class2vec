@@ -1,6 +1,7 @@
 #include<string>
 #include<fstream>
 #include<cmath>
+#include<cstdlib>
 #include<vector>
 #include<map>
 #include<set>
@@ -267,7 +268,7 @@ void dfs_save_code(FILE *fout, int root, char *code, int len) {
     }
     fprintf (fout, "\t");
     for (int i = 0; i < vec_size; ++i) {
-        char sep = i == vec_size - 1 ? '\n' : ' ';
+        char sep = i == vec_size - 1 ? '\n' : '\t';
         fprintf(fout, "%f%c", syn1[root * vec_size + i], sep);
     }
     if (children_index[2 * root] == 0) return;
@@ -280,7 +281,7 @@ void save_model(FILE *vocab_vec_file, FILE *class_vec_file) {
     for (map<string, int>::iterator it = vocab_index.begin(); it != vocab_index.end(); ++it) {
         fprintf (vocab_vec_file, "%s\t", it->first.c_str());
         for (int i = 0; i < vec_size; ++i) {
-            char sep = i == vec_size - 1 ? '\n' : ' ';
+            char sep = i == vec_size - 1 ? '\n' : '\t';
             fprintf(vocab_vec_file, "%f%c", syn0[it->second * vec_size + i], sep);
         }
     }

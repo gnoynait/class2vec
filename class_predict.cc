@@ -1,4 +1,5 @@
 #include<cstdio>
+#include<cstdlib>
 #include<string>
 #include<map>
 #include<cmath>
@@ -44,88 +45,84 @@ void load_vocab(FILE *vocab_file) {
     int newline = 1;
     int a = 0;
     int index = 0;
-    int vocab_next_index;
+    int vocab_next_index = 0;
     while ((len = read_word(vocab_file, buffer)) != -1) {
         if (len == 0) {
             newline = 1;
             a = 0;
+        } else if (newline) {
+            index = vocab_next_index++;
+            vocab_index[buffer] = index;
+            newline = 0;
         } else {
-            if (newline) {
-                index = vocab_next_index;
-                vocab_index[buffer] = index;
-                vocab_next_index++;
-                newline = 0;
-            } else {
-                syn0[index * vec_size + a] = atof(buffer);
-            }
+            syn0[index * vec_size + a] = atof(buffer);
         }
     }
+    // TODO
+    //vocab_size = vocab_index.size();
 }
 
 void load_nodes(FILE *node_file) {
     char buffer[MAX_WORD_LEN];
     int index = 0;
     int len;
-    int newline;
-    int a;
-    int node_next_index;
+    int newline = 1;
+    int a = 0;
+    int node_next_index = 0;
+    int node_count = 0;
     while ((len = read_word(node_file, buffer)) != -1) {
         if (len == 0) {
             newline = 1;
             a = 0;
-        } else {
-            if (newline) {
-                int prev = 0;
-                for (int i = 0; i < len - 1; i++) {
-                    if (buffer[i] == '/') {
-                        prev = 0;
-                        index = 0;
-                    } else if (buffer[i] == '0') {
-                        prev = index;
-                        index = children[prev * 2];
-                    } else {
-                        prev = index;
-                        index = children[prev * 2 + 1];
-                    }
-                }
-                index = node_next_index++;
-                if (buffer[len - 1] == '0') {
-                    children[prev * 2] = index;
-                    parent[index] = prev;
+        } else if (newline) {
+            node_count++;
+            for (int i = 0; i < len; i++) {
+                if (buffer[i] == '/') {
+                    index = 0;
                 } else {
-                    children[prev * 2 + 1] = index;
-                    parent[index] = prev;
+                    int c = buffer[i] - '0';
+                    if (children[index * 2 + c] == 0) {
+                        children[index * 2 + c] == node_next_index++;
+                    }
+                    index = children[index * 2 + c];
                 }
-                a = 0;
-            } else {
-                syn1[index * vec_size + a] = atof(buffer);
             }
+            a = 0;
+            newline = 0;
+        } else {
+            syn1[index * vec_size + a] = atof(buffer);
+            ++a;
         }
     }
+    // TODO
+    //class_num = node_count + 1;
 }
 
 void predict(int *words, int len, char *code) {
     int level = 0;
-    for (int i = 0; i < vec_size; ++i) {
-        neu[i] = 0;
-    }
-    for (int i = 0; i < len; i++) {
-        for (int j = 0; j < vec_size; ++j) {
-            neu[j] += syn0[i * vec_size + j];
-        }
-    }
     int node = 0;
+
     while (1) {
+        for (int i = 0; i < vec_size; ++i) {
+            neu[i] = 0;
+        }
+        for (int i = 0; i < len; i++) {
+            for (int j = 0; j < vec_size; ++j) {
+                neu[j] += syn0[i * vec_size + j];
+            }
+        }
         float f = 0;
         for (int i = 0; i < vec_size; ++i) {
             f += syn1[node * vec_size + i] * neu[i];
         }
         if (1.0 / (1 + exp(-f)) < 0.5) {
-            code[level++] = '0';
-        } else {
             code[level++] = '1';
+            node = children[node * 2];
+        } else {
+            code[level++] = '0';
+            node = children[node * 2 + 1];
         }
-        if (children[node * 2] == 0) break;
+        if (node == 0) break;
     }
     code[level] = '\0';
 }
@@ -151,19 +148,16 @@ void process(FILE *target_file, FILE *result_file) {
             break;
         }
     }
-
 }
-
-
 
 int main() {
     FILE *vocab_vec_file;
     FILE *node_vec_file;
     FILE *target_file;
     FILE *result_file;
-    vocab_vec_file = fopen("vocab_vec_file.dat", "r");
-    node_vec_file = fopen("node_vec_file.dat", "r");
-    target_file = fopen("target_file.dat", "r");
+    vocab_vec_file = fopen("vocab_vec.dat", "r");
+    node_vec_file = fopen("node_vec.dat", "r");
+    target_file = fopen("target.dat", "r");
     result_file = fopen("result.dat", "w");
     if (!(vocab_vec_file && node_vec_file && target_file && result_file)) {
         printf("open file error\n");
@@ -181,6 +175,10 @@ int main() {
     load_vocab(vocab_vec_file);
     load_nodes(node_vec_file);
     process(target_file, result_file);
+    fclose(vocab_vec_file);
+    fclose(node_vec_file);
+    fclose(target_file);
+    fclose(result_file);
     return 0;
 }
 
