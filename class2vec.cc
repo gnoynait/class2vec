@@ -16,7 +16,7 @@ typedef long long code_t;
 */
 // map code to its index in the syn1
 unordered_map<string, int> code_index;
-// the parent node's index
+// parent_index[i] is the index in syn1 of parent of the node who's index in syn1 is i
 int *parent_index;
 // map vocab word to its index in the syn0
 unordered_map<string, int> vocab_index;
@@ -94,10 +94,20 @@ void learn_vocab(FILE *train_file) {
         }
     }
     class_num = codes.size();
+    parent_index = (int *)malloc(sizeof(int) * (class_num * 2 - 1));
+    int class_next_index = 0;
+    int pre = 0;
     for (auto it = codes.begin(); it != codes.end(); ++it) {
-        //TODO
+        if (code_index.count(*it)) continue;
+        string code = *it;
+        for (int i = 1; i < code.length(); ++i) {
+            if (code_index.count(code.substr(0, i))) continue;
+            code_index[code.substr(0, i)] = class_next_index;
+            parent_index[class_next_index] = pre;
+            pre = class_next_index;
+            ++class_next_index;
+        }
     }
-    
 }
 
 void init_net() {
@@ -178,8 +188,7 @@ int read_record(FILE *fin, int *codes, int *nodes,
     return 1;
 }
 */
-int read_record(FILE *fin, int *codes, int *nodes, 
-    int *words, int &len_codes, int &len_words) {
+int read_record(FILE *fin, int *codes, int *nodes, int *words, int &len_codes, int &len_words) {
     char buffer[MAX_WROD_LEN];
     len_codes = 0;
     len_words = 0;
@@ -190,15 +199,19 @@ int read_record(FILE *fin, int *codes, int *nodes,
             break;
         }
         if (read_code) {
+            int node = code_index[buffer];
             for (int i = 0; i < len; ++i) {
                 assert(buffer[i] == '0' || buffer[i] == '1');
                 codes[i] = buffer[i] - '0';
+                nodes[len - 1 - i] = node;
+                node = parent[node];
             }
             len_codes = len;
             read_code = 0;
         } else {
             if (word_index.count(buffer) > 0) {
-                words[len_words++] = word_index[buffer];
+                words[len_words] = word_index[buffer];
+                ++len_words;
             }
         }
     }
