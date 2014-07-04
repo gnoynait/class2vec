@@ -26,12 +26,11 @@ int read_word(FILE *fin, char *buffer) {
     while (!feof(fin)) {
         ch = fgetc(fin);
         if (ch == '\n') {
-            if (len == 0) return 0;
             break;
         } else if (ch == ' ' || ch == '\t') {
             if (len == 0) continue;
             break;
-        } else {
+        } else if (len < MAX_WORD_LEN -1) {
             buffer[len++] = ch;
         }
     }

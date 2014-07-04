@@ -49,12 +49,11 @@ int read_word(FILE *fin, char *buffer) {
     while (!feof(fin)) {
         ch = fgetc(fin);
         if (ch == '\n') {
-            if (len == 0) return 0;
             break;
         } else if (ch == ' ' || ch == '\t') {
             if (len == 0) continue;
             break;
-        } else {
+        } else if (len < MAX_WORD_LEN - 1) {
             buffer[len++] = ch;
         }
     }
@@ -63,69 +62,65 @@ int read_word(FILE *fin, char *buffer) {
 }
 
 void learn_vocab(FILE *train_file) {
-    int word_next_index = 0;
-    int code_next_index = 0;
-    fseek(train_file, 0, SEEK_SET);
     char word[MAX_WORD_LEN];
     int word_len;
-    
     map<string, int> word_count; // count each number for filter words
     set<string> codes;
+
+    fseek(train_file, 0, SEEK_SET);
     int new_record = 1;
     while((word_len = read_word(train_file, word)) != -1) {
         if (word_len == 0) {
             new_record = 1;
+        } else if (new_record) {
+            codes.insert(word);
+            new_record = 0;
         } else {
-            if (new_record) {
-                codes.insert(word);
-                new_record = 0;
-            }
             word_count[word]++;
         }
     }
+
+    int word_next_index = 0;
     for (map<string, int>::iterator it = word_count.begin(); it != word_count.end(); ++it) {
         if (it->second >= min_word_count) {
-            vocab_index[it->first] = word_next_index;
-            ++word_next_index;
+            vocab_index[it->first] = word_next_index++;
         }
     }
+    vocab_size = vocab_index.size();
+
+    int node_next_index = 0;
     class_num = codes.size();
-    parent_index = (int *)malloc(sizeof(int) * (class_num - 1));
-    children_index = (int *)malloc(sizeof(int) * 2 * (class_num -1));
-    int class_next_index = 0;
+    parent_index = new int[class_num - 1]();
+    children_index = new int[(class_num - 1) * 2]();
     for (set<string>::iterator it = codes.begin(); it != codes.end(); ++it) {
         string code = *it;
         int pre = 0;
-        for (int i = 0; i < code.length(); ++i) {
+        for (int i = 0; i < code.length() - 1; ++i) {
             int c = code[i] - '0';
+            assert(c == 0 || c == 1);
             if (children_index[pre * 2 + c] == 0) {
-                children_index[pre * 2 + c] = class_next_index;
+                children_index[pre * 2 + c] = node_next_index;
+                parent_index[node_next_index] = pre;
+                ++node_next_index;
             }
-            parent_index[class_next_index] = pre;
-            pre = class_next_index;
-            ++class_next_index;
+            pre = children_index[pre * 2 + c];
         }
     }
 }
 
 void init_net() {
     syn0 = new float[vec_size * vocab_size];
-    syn1 = new float[vec_size * class_num * 2 - 1]();
+    syn1 = new float[vec_size * (class_num - 1)]();
     neu = new float[vec_size];
     eneu = new float[vec_size];
-
-    expTable = (float *)malloc((EXP_TABLE_SIZE + 1) * sizeof(float));
-    if (expTable == NULL) {
+    expTable = new float[EXP_TABLE_SIZE + 1];
+    if (!(syn0 && syn1 && neu && eneu && expTable)) {
         fprintf(stderr, "out of memory\n");
         exit(1);
     }
     for (int i = 0; i < EXP_TABLE_SIZE; i++) {
         expTable[i] = exp((i / (float)EXP_TABLE_SIZE * 2 - 1) * MAX_EXP); // Precompute the exp() table
         expTable[i] = expTable[i] / (expTable[i] + 1);                   // Precompute f(x) = x / (x + 1)
-    }
-    if (!(syn0 && syn1 && neu && eneu)) {
-        printf("Memory allocation failed.\n");
-        exit(1);
     }
     for (int i = 0; i < vocab_size; ++i) {
         for (int j = 0; j < vec_size; ++j) {
@@ -186,26 +181,30 @@ int read_record(FILE *fin, int *codes, int *nodes,
     return 1;
 }
 */
-int read_record(FILE *fin, int *codes, int *nodes, int *words, int &len_codes, int &len_words) {
+int read_record(FILE *fin, int *code, int *nodes, int *words, int &len_code, int &len_words) {
     char buffer[MAX_WORD_LEN];
-    len_codes = 0;
+    len_code = 0;
     len_words = 0;
     int len;
     int read_code = 1;
     while ((len = read_word(fin, buffer)) != -1) {
         if (len == 0) {
-            break;
+            if (len_code > 0) {
+                break;
+            } else {
+                continue;
+            }
         }
         if (read_code) {
             int node;
             int pre = 0;
             for (int i = 0; i < len; ++i) {
                 assert(buffer[i] == '0' || buffer[i] == '1');
-                codes[i] = buffer[i] - '0';
-                codes[i] = children_index[pre * 2 + buffer[i] - '0'];
-                node = codes[i];
+                code[i] = buffer[i] - '0';
+                nodes[i] = pre;
+                pre = children_index[pre * 2 + buffer[i] - '0'];
             }
-            len_codes = len;
+            len_code = len;
             read_code = 0;
         } else {
             if (vocab_index.count(buffer) > 0) {
@@ -214,16 +213,18 @@ int read_record(FILE *fin, int *codes, int *nodes, int *words, int &len_codes, i
             }
         }
     }
-    return len_codes > 0;
+    return len_code > 0;
 }
+
 void train_model(FILE *train_file) {
-    int codes[MAX_CODE_LEN];
+    int code[MAX_CODE_LEN];
     int nodes[MAX_CODE_LEN];
     int words[MAX_RECORD_WORDS];
-    int len_codes, len_words;
+    int len_code, len_words;
     int record_count = 0;
     float alpha;
-    while (read_record(train_file, codes, nodes, words, len_codes, len_words )) {
+    fseek(train_file, 0, SEEK_SET);
+    while (read_record(train_file, code, nodes, words, len_code, len_words )) {
         alpha = starting_alpha * (1 - record_count / (float)100000);
         if (alpha < starting_alpha * 0.0001) alpha = starting_alpha * 0.0001;
         for (int i = 0; i < vec_size; ++i) {
@@ -235,7 +236,7 @@ void train_model(FILE *train_file) {
                 neu[j] += syn0[words[i] * vec_size + j];
             }
         }
-        for (int i = 0; i < len_codes; ++i) {
+        for (int i = 0; i < len_code; ++i) {
             float f = 0;
             float g;
             for (int j = 0; j < vec_size; ++j) {
@@ -244,8 +245,8 @@ void train_model(FILE *train_file) {
             if (f <= -MAX_EXP) continue;
             else if (f >= MAX_EXP) continue;
             else f = expTable[(int)((f + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))];
-            g = (1 - codes[i] - f) * alpha;
-            for (int c = 0; c < vec_size; c++) {
+            g = (1 - code[i] - f) * alpha;
+            for (int c = 0; c < vec_size; ++c) {
                 eneu[c] += g * syn1[nodes[i] * vec_size + c];
                 syn1[nodes[i] * vec_size + c] += g * neu[c];
             }
@@ -255,6 +256,7 @@ void train_model(FILE *train_file) {
                 syn0[c + words[i] * vec_size] += eneu[c];
             }
         }
+        ++record_count;
     }
 }
 
