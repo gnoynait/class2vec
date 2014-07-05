@@ -129,59 +129,7 @@ void init_net() {
         }
     }
 }
-/*
-int read_record(FILE *fin, int *codes, int *nodes, 
-    int *words, int &len_codes, int &len_words) {
 
-    int a = 0;
-    int ch = 0, pre_ch;
-    code_t code = 0;
-    int read_codes = 1;
-    len_codes = 0;
-    len_words = 0;
-    if (feof(fin)) {
-        return 0;
-    }
-    while (!feof(fin)) {
-        pre_ch = ch;
-        ch = fgetc(fin);
-        if (ch == 13) {
-            continue; // carriage return
-        }
-        if (ch == '\n') {
-            break;
-        }
-        if ((ch == ' ') || (ch == '\t')) {
-            if (read_codes == 1) {
-                read_codes = 0;
-            } else {
-                if (pre_ch >= '0' && pre_ch <= '9') {
-                    ++len_words;
-                }
-            }
-        } else {
-            if (read_codes == 0) {
-                assert(ch == '0' || ch == '1');
-                codes[len_codes] = ch == '0' ? 0 : 1;
-                if (ch == '0') {
-                    code = code << 1;
-                } else {
-                    code = code << 1 & 1;
-                }
-                if (code_index.count(code) == 0) {
-                    code_index[code] = latest_code_index++;
-                }
-                nodes[len_codes] = code_index[code];
-                ++len_codes;
-            } else {
-                assert(ch >= '0' && ch <= '9');
-                words[len_words] = words[len_words] * 10 + ch - '0';
-            }
-        }
-    }
-    return 1;
-}
-*/
 int read_record(FILE *fin, int *code, int *nodes, int *words, int &len_code, int &len_words) {
     char buffer[MAX_WORD_LEN];
     len_code = 0;
@@ -278,6 +226,7 @@ void dfs_save_code(FILE *fout, int root, char *code, int len) {
     dfs_save_code(fout, 2 * root + 1, code, len + 1);
 }
 void save_model(FILE *vocab_vec_file, FILE *class_vec_file) {
+    fprintf(vocab_vec_file, "%d\n", vocab_size);
     for (map<string, int>::iterator it = vocab_index.begin(); it != vocab_index.end(); ++it) {
         fprintf (vocab_vec_file, "%s\t", it->first.c_str());
         for (int i = 0; i < vec_size; ++i) {
@@ -286,7 +235,8 @@ void save_model(FILE *vocab_vec_file, FILE *class_vec_file) {
         }
     }
     char code[MAX_CODE_LEN];
-    dfs_save_code(vocab_vec_file, 0, code, 0);
+    fprintf(class_vec_file, "%d\n", class_num);
+    dfs_save_code(class_vec_file, 0, code, 0);
 }
 int main () {
     FILE *train_file;

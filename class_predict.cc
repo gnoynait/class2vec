@@ -46,6 +46,7 @@ void load_vocab(FILE *vocab_file) {
     int a = 0;
     int index = 0;
     int vocab_next_index = 0;
+    fscanf(vocab_file, "%d\n", &vocab_size);
     while ((len = read_word(vocab_file, buffer)) != -1) {
         if (len == 0) {
             newline = 1;
@@ -58,8 +59,6 @@ void load_vocab(FILE *vocab_file) {
             syn0[index * vec_size + a] = atof(buffer);
         }
     }
-    // TODO
-    //vocab_size = vocab_index.size();
 }
 
 void load_nodes(FILE *node_file) {
@@ -70,6 +69,7 @@ void load_nodes(FILE *node_file) {
     int a = 0;
     int node_next_index = 0;
     int node_count = 0;
+    fscanf(node_file, "%d\n", &class_num);
     while ((len = read_word(node_file, buffer)) != -1) {
         if (len == 0) {
             newline = 1;
