@@ -7,8 +7,8 @@
 #define MAX_RECORD_LEN 50
 #define MAX_CODE_LEN 50
 using namespace std;
-int vec_size = 100;
-int class_num;
+int vec_size;
+int node_num;
 int vocab_size;
 int *parent;
 int *children;
@@ -21,17 +21,21 @@ map<string, int> vocab_index;
 //         len if read a word
 //        -1 if end of file
 int read_word(FILE *fin, char *buffer) {
-    if (feof(fin)) return -1;
     int len = 0;
     char ch;
-    while (!feof(fin)) {
-        ch = fgetc(fin);
+    if (feof(fin)) {
+        return -1;
+    }
+    while ((ch = fgetc(fin)) != EOF) {
         if (ch == '\n') {
+            if (len > 0) {
+                ungetc(ch, fin);
+            }
             break;
         } else if (ch == ' ' || ch == '\t') {
             if (len == 0) continue;
             break;
-        } else if (len < MAX_WORD_LEN -1) {
+        } else if (len < MAX_WORD_LEN - 1) {
             buffer[len++] = ch;
         }
     }
@@ -46,7 +50,6 @@ void load_vocab(FILE *vocab_file) {
     int a = 0;
     int index = 0;
     int vocab_next_index = 0;
-    fscanf(vocab_file, "%d\n", &vocab_size);
     while ((len = read_word(vocab_file, buffer)) != -1) {
         if (len == 0) {
             newline = 1;
@@ -69,7 +72,6 @@ void load_nodes(FILE *node_file) {
     int a = 0;
     int node_next_index = 0;
     int node_count = 0;
-    fscanf(node_file, "%d\n", &class_num);
     while ((len = read_word(node_file, buffer)) != -1) {
         if (len == 0) {
             newline = 1;
@@ -94,8 +96,6 @@ void load_nodes(FILE *node_file) {
             ++a;
         }
     }
-    // TODO
-    //class_num = node_count + 1;
 }
 
 void predict(int *words, int len, char *code) {
@@ -163,10 +163,12 @@ int main() {
         printf("open file error\n");
         exit(1);
     }
-    parent = new int[class_num -1]();
-    children = new int[(class_num - 1) * 2]();
+    fscanf(node_vec_file, "%d\n", &node_num);
+    fscanf(vocab_vec_file, "%d%d\n", &vocab_size, &vec_size);
+    parent = new int[node_num]();
+    children = new int[node_num * 2]();
     syn0 = new float[vocab_size * vec_size]();
-    syn1 = new float[(class_num - 1) * vec_size]();
+    syn1 = new float[node_num * vec_size]();
     neu = new float[vec_size]();
     if (!(parent && children && syn0 && syn1 && neu)) {
         printf ("memory allocation error\n");

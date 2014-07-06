@@ -1,4 +1,5 @@
 #include<string>
+#include<cstring>
 #include<iostream>
 #include<fstream>
 #include<cmath>
@@ -8,7 +9,6 @@
 #include<set>
 #include<cassert>
 using namespace std;
-typedef long long code_t;
 #define MAX_CODE_LEN 60
 #define MAX_RECORD_WORDS 60
 #define MAX_WORD_LEN 60
@@ -29,7 +29,7 @@ int vocab_size;
 // how many class
 int node_num;
 // if a word appears less than min_word_count, it will be ignored
-int min_word_count = 0;
+int min_word_count;
 // syn0: vector table for word
 // syn1: vector table for class
 // neu:  vecotr for middle sum unit
@@ -37,9 +37,9 @@ int min_word_count = 0;
 float *syn0, *syn1, *neu, *eneu;
 // for fast compute 1/(1 + exp(x))
 float *expTable;
-clock_t start;
 // inital parameter changing step
 float starting_alpha = 0.025;
+int max_round = 1000;
 // read a word from fin
 // return: 0 if '\n'
 //         len if read a word
@@ -50,11 +50,8 @@ int read_word(FILE *fin, char *buffer) {
     if (feof(fin)) {
         return -1;
     }
-    // TODO modifiy class_predict
     while ((ch = fgetc(fin)) != EOF) {
-        //ch = fgetc(fin);
         if (ch == '\n') {
-            //TODO modify class_predict
             if (len > 0) {
                 ungetc(ch, fin);
             }
@@ -136,6 +133,11 @@ void init_net() {
             syn1[i * vec_size + j] = (rand() / (float)RAND_MAX - 0.5) / vec_size;
         }
     }
+    for (int i = 0; i < vocab_size; ++i) {
+        for (int j = 0; j < vec_size; ++j) {
+            syn0[i * vec_size + j] = (rand() / (float)RAND_MAX - 0.5) / vec_size;
+        }
+    }
 }
 
 int read_record(FILE *fin, int *code, int *nodes, int *words, int &len_code, int &len_words) {
@@ -146,16 +148,11 @@ int read_record(FILE *fin, int *code, int *nodes, int *words, int &len_code, int
     int read_code = 1;
     while ((len = read_word(fin, buffer)) != -1) {
         if (len == 0) {
-            read_code = 1;
-            if (len_code > 0) {
-                break;
-            } else {
-                continue;
-            }
-        }
-        if (read_code) {
+            if (read_code == 0) break;
+        } else if (read_code) {
             int node;
             int pre = 0;
+            len = len <= MAX_CODE_LEN ? len : MAX_CODE_LEN;
             for (int i = 0; i < len; ++i) {
                 assert(buffer[i] == '0' || buffer[i] == '1');
                 code[i] = buffer[i] - '0';
@@ -164,11 +161,9 @@ int read_record(FILE *fin, int *code, int *nodes, int *words, int &len_code, int
             }
             len_code = len;
             read_code = 0;
-        } else {
-            if (vocab_index.count(buffer) > 0) {
-                words[len_words] = vocab_index[buffer];
-                len_words = len_words + 1 < MAX_RECORD_WORDS - 1 ? len_words + 1 : MAX_RECORD_WORDS - 1;
-            }
+        } else if (vocab_index.count(buffer) > 0 && len_words < MAX_RECORD_WORDS) {
+            words[len_words] = vocab_index[buffer];
+            ++len_words;
         }
     }
     return len_code > 0;
@@ -183,7 +178,7 @@ void train_model(FILE *train_file) {
     float alpha;
     fseek(train_file, 0, SEEK_SET);
     while (read_record(train_file, code, nodes, words, len_code, len_words )) {
-        cerr << record_count << endl;
+        //cerr << record_count << endl;
         alpha = starting_alpha * (1 - record_count / (float)100000);
         if (alpha < starting_alpha * 0.0001) alpha = starting_alpha * 0.0001;
         for (int i = 0; i < vec_size; ++i) {
@@ -236,7 +231,7 @@ void dfs_save_code(FILE *fout, int root, char *code, int len) {
     dfs_save_code(fout, 2 * root + 1, code, len + 1);
 }
 void save_model(FILE *vocab_vec_file, FILE *class_vec_file) {
-    fprintf(vocab_vec_file, "%d\n", vocab_size);
+    fprintf(vocab_vec_file, "%d %d\n", vocab_size, vec_size);
     for (map<string, int>::iterator it = vocab_index.begin(); it != vocab_index.end(); ++it) {
         fprintf (vocab_vec_file, "%s\t", it->first.c_str());
         for (int i = 0; i < vec_size; ++i) {
@@ -248,10 +243,15 @@ void save_model(FILE *vocab_vec_file, FILE *class_vec_file) {
     fprintf(class_vec_file, "%d\n", node_num);
     dfs_save_code(class_vec_file, 0, code, 0);
 }
-int main () {
+int main (int argc, char *argv[]) {
     FILE *train_file;
     FILE *vocab_vec_file;
     FILE *class_vec_file;
+    for (int i = 0; i < argc; ++i) {
+        if (strcmp(argv[i], "-s") == 0) vec_size = atoi(argv[i + 1]);
+        if (strcmp(argv[i], "-m") == 0) min_word_count = atoi(argv[i + 1]);
+        if (strcmp(argv[i], "-r") == 0) max_round = atoi(argv[i + 1]);
+    }
     train_file = fopen("train.dat", "r");
     vocab_vec_file = fopen("vocab_vec.dat", "w");
     class_vec_file = fopen("node_vec.dat", "w");
@@ -261,7 +261,9 @@ int main () {
     }
     learn_vocab(train_file);
     init_net();
-    train_model(train_file);
+    for (int i = 0; i < max_round; ++i) {
+        train_model(train_file);
+    }
     save_model(vocab_vec_file, class_vec_file);
     fclose(train_file);
     fclose(vocab_vec_file);
