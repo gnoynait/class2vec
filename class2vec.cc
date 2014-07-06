@@ -1,4 +1,5 @@
 #include<string>
+#include<iostream>
 #include<fstream>
 #include<cmath>
 #include<cstdlib>
@@ -26,9 +27,9 @@ int vec_size = 100;
 // how many vocab word in the table
 int vocab_size;
 // how many class
-int class_num;
+int node_num;
 // if a word appears less than min_word_count, it will be ignored
-int min_word_count = 20;
+int min_word_count = 0;
 // syn0: vector table for word
 // syn1: vector table for class
 // neu:  vecotr for middle sum unit
@@ -44,12 +45,19 @@ float starting_alpha = 0.025;
 //         len if read a word
 //        -1 if end of file
 int read_word(FILE *fin, char *buffer) {
-    if (feof(fin)) return -1;
     int len = 0;
     char ch;
-    while (!feof(fin)) {
-        ch = fgetc(fin);
+    if (feof(fin)) {
+        return -1;
+    }
+    // TODO modifiy class_predict
+    while ((ch = fgetc(fin)) != EOF) {
+        //ch = fgetc(fin);
         if (ch == '\n') {
+            //TODO modify class_predict
+            if (len > 0) {
+                ungetc(ch, fin);
+            }
             break;
         } else if (ch == ' ' || ch == '\t') {
             if (len == 0) continue;
@@ -90,9 +98,9 @@ void learn_vocab(FILE *train_file) {
     vocab_size = vocab_index.size();
 
     int node_next_index = 0;
-    class_num = codes.size();
-    parent_index = new int[class_num - 1]();
-    children_index = new int[(class_num - 1) * 2]();
+    node_num = codes.size() - 1;
+    parent_index = new int[node_num]();
+    children_index = new int[node_num * 2]();
     for (set<string>::iterator it = codes.begin(); it != codes.end(); ++it) {
         string code = *it;
         int pre = 0;
@@ -111,7 +119,7 @@ void learn_vocab(FILE *train_file) {
 
 void init_net() {
     syn0 = new float[vec_size * vocab_size];
-    syn1 = new float[vec_size * (class_num - 1)]();
+    syn1 = new float[vec_size * node_num]();
     neu = new float[vec_size];
     eneu = new float[vec_size];
     expTable = new float[EXP_TABLE_SIZE + 1];
@@ -123,7 +131,7 @@ void init_net() {
         expTable[i] = exp((i / (float)EXP_TABLE_SIZE * 2 - 1) * MAX_EXP); // Precompute the exp() table
         expTable[i] = expTable[i] / (expTable[i] + 1);                   // Precompute f(x) = x / (x + 1)
     }
-    for (int i = 0; i < vocab_size; ++i) {
+    for (int i = 0; i < node_num; ++i) {
         for (int j = 0; j < vec_size; ++j) {
             syn1[i * vec_size + j] = (rand() / (float)RAND_MAX - 0.5) / vec_size;
         }
@@ -138,6 +146,7 @@ int read_record(FILE *fin, int *code, int *nodes, int *words, int &len_code, int
     int read_code = 1;
     while ((len = read_word(fin, buffer)) != -1) {
         if (len == 0) {
+            read_code = 1;
             if (len_code > 0) {
                 break;
             } else {
@@ -158,7 +167,7 @@ int read_record(FILE *fin, int *code, int *nodes, int *words, int &len_code, int
         } else {
             if (vocab_index.count(buffer) > 0) {
                 words[len_words] = vocab_index[buffer];
-                ++len_words;
+                len_words = len_words + 1 < MAX_RECORD_WORDS - 1 ? len_words + 1 : MAX_RECORD_WORDS - 1;
             }
         }
     }
@@ -174,6 +183,7 @@ void train_model(FILE *train_file) {
     float alpha;
     fseek(train_file, 0, SEEK_SET);
     while (read_record(train_file, code, nodes, words, len_code, len_words )) {
+        cerr << record_count << endl;
         alpha = starting_alpha * (1 - record_count / (float)100000);
         if (alpha < starting_alpha * 0.0001) alpha = starting_alpha * 0.0001;
         for (int i = 0; i < vec_size; ++i) {
@@ -235,7 +245,7 @@ void save_model(FILE *vocab_vec_file, FILE *class_vec_file) {
         }
     }
     char code[MAX_CODE_LEN];
-    fprintf(class_vec_file, "%d\n", class_num);
+    fprintf(class_vec_file, "%d\n", node_num);
     dfs_save_code(class_vec_file, 0, code, 0);
 }
 int main () {
@@ -244,11 +254,13 @@ int main () {
     FILE *class_vec_file;
     train_file = fopen("train.dat", "r");
     vocab_vec_file = fopen("vocab_vec.dat", "w");
-    class_vec_file = fopen("class_vec.dat", "w");
+    class_vec_file = fopen("node_vec.dat", "w");
     if (!(train_file && vocab_vec_file && class_vec_file)) {
         printf ("Open file error\n");
         exit(1);
     }
+    learn_vocab(train_file);
+    init_net();
     train_model(train_file);
     save_model(vocab_vec_file, class_vec_file);
     fclose(train_file);
