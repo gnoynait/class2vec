@@ -70,7 +70,7 @@ void load_nodes(FILE *node_file) {
     int len;
     int newline = 1;
     int a = 0;
-    int node_next_index = 0;
+    int node_next_index = 1;
     int node_count = 0;
     while ((len = read_word(node_file, buffer)) != -1) {
         if (len == 0) {
@@ -102,25 +102,25 @@ void predict(int *words, int len, char *code) {
     int level = 0;
     int node = 0;
 
+    for (int i = 0; i < vec_size; ++i) {
+        neu[i] = 0;
+    }
+    for (int i = 0; i < len; i++) {
+        for (int j = 0; j < vec_size; ++j) {
+            neu[j] += syn0[words[i] * vec_size + j];
+        }
+    }
     while (1) {
-        for (int i = 0; i < vec_size; ++i) {
-            neu[i] = 0;
-        }
-        for (int i = 0; i < len; i++) {
-            for (int j = 0; j < vec_size; ++j) {
-                neu[j] += syn0[i * vec_size + j];
-            }
-        }
         float f = 0;
         for (int i = 0; i < vec_size; ++i) {
             f += syn1[node * vec_size + i] * neu[i];
         }
         if (1.0 / (1 + exp(-f)) < 0.5) {
             code[level++] = '1';
-            node = children[node * 2];
+            node = children[node * 2 + 1];
         } else {
             code[level++] = '0';
-            node = children[node * 2 + 1];
+            node = children[node * 2];
         }
         if (node == 0) break;
     }
