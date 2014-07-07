@@ -84,7 +84,7 @@ void load_nodes(FILE *node_file) {
                 } else {
                     int c = buffer[i] - '0';
                     if (children[index * 2 + c] == 0) {
-                        children[index * 2 + c] == node_next_index++;
+                        children[index * 2 + c] = node_next_index++;
                     }
                     index = children[index * 2 + c];
                 }
