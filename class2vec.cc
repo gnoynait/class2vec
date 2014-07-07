@@ -94,7 +94,7 @@ void learn_vocab(FILE *train_file) {
     }
     vocab_size = vocab_index.size();
 
-    int node_next_index = 0;
+    int node_next_index = 1;
     node_num = codes.size() - 1;
     parent_index = new int[node_num]();
     children_index = new int[node_num * 2]();
@@ -224,11 +224,14 @@ void dfs_save_code(FILE *fout, int root, char *code, int len) {
         char sep = i == vec_size - 1 ? '\n' : '\t';
         fprintf(fout, "%f%c", syn1[root * vec_size + i], sep);
     }
-    if (children_index[2 * root] == 0) return;
-    code[len] = '0';
-    dfs_save_code(fout, 2 * root, code, len + 1);
-    code[len] = '1';
-    dfs_save_code(fout, 2 * root + 1, code, len + 1);
+    if (children_index[2 * root]) {
+        code[len] = '0';
+        dfs_save_code(fout, children_index[2 * root], code, len + 1);
+    }
+    if (children_index[2 * root + 1]) {
+        code[len] = '1';
+        dfs_save_code(fout, children_index[2 * root + 1], code, len + 1);
+    }
 }
 void save_model(FILE *vocab_vec_file, FILE *class_vec_file) {
     fprintf(vocab_vec_file, "%d %d\n", vocab_size, vec_size);
