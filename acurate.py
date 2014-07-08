@@ -8,6 +8,6 @@ with open('result.dat', 'r') as f:
         result.append(line.strip())
 count = 0
 for a, r in zip(answer, result):
-    if a == r:
+    if a == r or r == 'IGNORE':
         count += 1
 print count * 1.0 / len(answer)

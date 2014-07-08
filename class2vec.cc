@@ -29,7 +29,9 @@ int vocab_size;
 // how many class
 int node_num;
 // if a word appears less than min_word_count, it will be ignored
-int min_word_count;
+int min_word_count = 3;
+// if a reocrd has less than min_record_words words, it will be ignored
+int min_record_words = 3;
 // syn0: vector table for word
 // syn1: vector table for class
 // neu:  vecotr for middle sum unit
@@ -179,6 +181,7 @@ void train_model(FILE *train_file) {
     float alpha;
     fseek(train_file, 0, SEEK_SET);
     while (read_record(train_file, code, nodes, words, len_code, len_words )) {
+        if (len_words < min_record_words) continue;
         //cerr << record_count << endl;
         alpha = starting_alpha * (1 - record_count / (float)100000);
         if (alpha < starting_alpha * 0.0001) alpha = starting_alpha * 0.0001;
@@ -255,6 +258,7 @@ int main (int argc, char *argv[]) {
         if (strcmp(argv[i], "-s") == 0) vec_size = atoi(argv[i + 1]);
         if (strcmp(argv[i], "-m") == 0) min_word_count = atoi(argv[i + 1]);
         if (strcmp(argv[i], "-r") == 0) max_round = atoi(argv[i + 1]);
+        if (strcmp(argv[i], "-n") == 0) min_record_words = atoi(argv[i + 1]);
     }
     train_file = fopen("train.dat", "r");
     vocab_vec_file = fopen("vocab_vec.dat", "w");
@@ -263,14 +267,24 @@ int main (int argc, char *argv[]) {
         printf ("Open file error\n");
         exit(1);
     }
+
+    fprintf(stderr, "learning vocabulary\n");
     learn_vocab(train_file);
+    fprintf(stderr, "vocab size:\t%d\n", vocab_size);
     init_net();
     for (int i = 0; i < max_round; ++i) {
+        fprintf(stderr, "start round %d/%d\n", i + 1, max_round);
         train_model(train_file);
     }
+    
+    fprintf(stderr, "saving model\n");
     save_model(vocab_vec_file, class_vec_file);
     fclose(train_file);
     fclose(vocab_vec_file);
     fclose(class_vec_file);
+    
+    fprintf(stderr, "vector size:\t%d\n", vocab_size);
+    fprintf(stderr, "vocab  size:\t%d\n", vocab_size);
+    fprintf(stderr, "node number:\t%d\n", node_num);
     return 0;
 }

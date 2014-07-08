@@ -1,11 +1,12 @@
 #include<cstdio>
+#include<cstring>
 #include<cstdlib>
 #include<string>
 #include<map>
 #include<cmath>
-#define MAX_WORD_LEN 500
-#define MAX_RECORD_LEN 50
-#define MAX_CODE_LEN 50
+#define MAX_WORD_LEN 60
+#define MAX_RECORD_LEN 60
+#define MAX_CODE_LEN 60
 using namespace std;
 int vec_size;
 int node_num;
@@ -15,6 +16,7 @@ int *children;
 float *neu;
 float *syn0;
 float *syn1;
+int min_record_words = 3;
 map<string, int> vocab_index;
 // read a word from fin
 // return: 0 if '\n'
@@ -80,7 +82,7 @@ void load_nodes(FILE *node_file) {
             a = 0;
         } else if (newline) {
             node_count++;
-            for (int i = 0; i < len; i++) {
+            for (int i = 0; i < len && i < MAX_CODE_LEN; i++) {
                 if (buffer[i] == '/') {
                     index = 0;
                 } else {
@@ -103,7 +105,10 @@ void load_nodes(FILE *node_file) {
 void predict(int *words, int len, char *code) {
     int level = 0;
     int node = 0;
-
+    if (len < min_record_words) {
+        strcpy(code, "IGNORE");
+        return;
+    }
     for (int i = 0; i < vec_size; ++i) {
         neu[i] = 0;
     }
@@ -139,9 +144,8 @@ void process(FILE *target_file, FILE *result_file) {
     while (1) {
         len = read_word(target_file, buffer);
         if (len > 0) {
-            if (vocab_index.count(buffer)) {
+            if (vocab_index.count(buffer) && len_record < MAX_RECORD_LEN) 
                 words[len_record++] = vocab_index[buffer];
-            }
         } else if (len == 0) {
             predict(words, len_record, code);
             fprintf (result_file, "%s\n", code);
@@ -185,4 +189,3 @@ int main() {
     fclose(result_file);
     return 0;
 }
-
