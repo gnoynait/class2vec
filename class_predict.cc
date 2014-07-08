@@ -40,6 +40,7 @@ int read_word(FILE *fin, char *buffer) {
         }
     }
     buffer[len] = '\0';
+    if (len == 0 && ch == EOF) return -1;
     return len;
 }
 
@@ -60,6 +61,7 @@ void load_vocab(FILE *vocab_file) {
             newline = 0;
         } else {
             syn0[index * vec_size + a] = atof(buffer);
+            a++;
         }
     }
 }
@@ -115,7 +117,7 @@ void predict(int *words, int len, char *code) {
         for (int i = 0; i < vec_size; ++i) {
             f += syn1[node * vec_size + i] * neu[i];
         }
-        if (1.0 / (1 + exp(-f)) < 0.5) {
+        if (f < 0) {
             code[level++] = '1';
             node = children[node * 2 + 1];
         } else {

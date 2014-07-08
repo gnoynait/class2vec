@@ -64,6 +64,7 @@ int read_word(FILE *fin, char *buffer) {
         }
     }
     buffer[len] = '\0';
+    if (len == 0 && ch == EOF) return -1;
     return len;
 }
 
