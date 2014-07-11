@@ -2,8 +2,6 @@ class TreeNode(object):
     def __init__(self, name):
         self.name = name
         self.children = []
-        self.left = None
-        self.right = None
     def add(self, path, depth):
         if depth >= len(path):
             return
@@ -19,7 +17,10 @@ class TreeNode(object):
         if len(self.children) == 0:
             return
         elif len(self.children) == 1:
-            self.name = self.name +'.' +  self.children[0].name
+            if self.name == '':
+                self.name = self.children[0].name
+            else:
+                self.name = self.name +'.' +  self.children[0].name
             self.children = self.children[0].children
             self.ajust()
         elif len(self.children) == 2:
@@ -53,7 +54,7 @@ class TreeNode(object):
         
 
 def buildTree(tree_file):
-    root = TreeNode('http://')
+    root = TreeNode('')
     for line in tree_file:
         line = line.strip()
         if line == '':
