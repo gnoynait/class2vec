@@ -16,9 +16,11 @@ using namespace std;
 #define MAX_EXP 6
 // map code to its index in the syn1
 map<string, int> code_index;
-// parent_index[i] is the index in syn1 of parent of the node who's index in syn1 is i
-int *parent_index;
-int *children_index;
+// parent[i] is the index in syn1 of parent of the node who's index in syn1 is i
+int *parent;
+int *code_table;
+int *children;
+string *node_name;
 // map vocab word to its index in the syn0
 map<string, int> vocab_index;
 //int latest_code_index = 0;
@@ -41,7 +43,72 @@ float *syn0, *syn1, *neu, *eneu;
 float *expTable;
 // inital parameter changing step
 float starting_alpha = 0.025;
-int max_round = 1000;
+int max_round = 5;
+struct Tree {
+    string name;
+    int index;
+    struct Tree *link[2];
+    Tree (string n) : name(n) {link[0] = 0, link[1] = 0}
+};
+
+Tree *add_to_tree(Tree *root, name) {
+    Tree *p = root->link[0];
+    if (p == 0) {
+        p = new Tree(name);
+        root->link[0] = p;
+        return p;
+    }
+    while (p->name != name && p->link[1] != 0) {
+        p = p->link[1];
+    }
+    if (p->name == name) return p;
+    p->link[1] = new Tree(name);
+    return p->link[1];
+}
+
+void ajust_tree(Tree *root) {
+    if (root->link[0] == 0) return;
+    Tree *p1 = root->link[0], *p2 = root->link[0];
+    int count = 0;
+    // one child
+    if (p1->link[1] == 0) {
+        root->name = root->name == '' ? p1->name : root->name + '.' + p1->name;
+        root->link[0] = p1->link[0];
+        delete p1;
+        return;
+    }
+    // two children
+    if (p1->link[1]->link[1] == 0) {
+        root->link[0] = p1;
+        root->link[1] = p1->link[1];
+        p1->link[1] = 0;
+        return;
+    }
+    // three children
+    if (p1->link[1]->link[1]->link[1] == 0) {
+        root->link[0] = new Tree("*");
+        root->link[0]->link[0] = p1;
+        root->link[1] = p1->link[1]->link[1];
+        p1->link[1]->link[1] = 0;
+        ajust_tree(root->link[0]);
+        ajust_tree(toot->link[1]);
+        return;
+    }
+
+    // more than three
+    root->link[0] = new Tree("*");
+    root->link[0]->link[0] = p1;
+    root->link[1] = new Tree("*");
+    while (p2 && p2->link[1]) {
+        p1 = p1->link[1];
+        p2 = p2->link[1]->link[1];
+    }
+    root->link[1]->link[0] = p1->link[1];
+    p1->link[1] = 0;
+    ajust_tree(root->link[0]);
+    ajust_tree(root->link[1]);
+}
+
 // read a word from fin
 // return: 0 if '\n'
 //         len if read a word
@@ -70,6 +137,25 @@ int read_word(FILE *fin, char *buffer) {
     return len;
 }
 
+void add_node(Tree *t, int index, string prefix) {
+    t->index = index;
+    if (t->link[0] == 0) return index;
+    int next = add_node(t->link[0], index + 1);
+    parent[index + 1] = index;
+    code_table[index + 1] = 0;
+    parent[next] = index;
+    code_table[next] = 1;
+    return add_node (t->link[1], next);
+}
+void encode() {
+    // TODO code_tree
+    code_tree;
+
+    add_node(code_tree, 0);
+
+
+
+}
 void learn_vocab(FILE *train_file) {
     char word[MAX_WORD_LEN];
     int word_len;
@@ -98,21 +184,52 @@ void learn_vocab(FILE *train_file) {
     vocab_size = vocab_index.size();
 
     int node_next_index = 1;
-    node_num = codes.size() - 1;
-    parent_index = new int[node_num]();
-    children_index = new int[node_num * 2]();
+    vector<string> long_codes;
+    for (set<string>::iterator it = codes.begin(); it != codes.end(); ++it) {
+        if (long_codes.empty()) {
+            long_codes.push_back(*it);
+        } else if (it->find(long_codes.back()) == 0 
+            && (*it)[long_codes.back().length()] == '.') {
+            long_codes.back() = *it;
+        } else {
+            long_codes.push_back(*it);
+        }
+    }
+    //TODO node_num
+    node_num = long_codes.size() - 1;
+
+    parent = new int[node_num]();
+    children = new int[node_num * 2]();
+    node_name = new int[node_num * 2]();
+    for (vecotr<string>::iterator it = long_codes.begin(); 
+            it != long_codes.end(); ++it) {
+        int end = 0;
+        int begin = 0;
+        // TODO  global code_tree
+        Tree *root = code_tree;
+        while (end != it->length()) {
+            while ((*it)[end] != '.' && end != it->length()){
+                end++;
+            }
+            string name = it->substr(begin, end);
+            root = add_to_tree(root, name); 
+            begin = end;
+        }
+    }
+    ajust_tree(code_tree);
+    encode();
     for (set<string>::iterator it = codes.begin(); it != codes.end(); ++it) {
         string code = *it;
         int pre = 0;
         for (int i = 0; i < code.length() - 1; ++i) {
             int c = code[i] - '0';
             assert(c == 0 || c == 1);
-            if (children_index[pre * 2 + c] == 0) {
-                children_index[pre * 2 + c] = node_next_index;
-                parent_index[node_next_index] = pre;
+            if (children[pre * 2 + c] == 0) {
+                children[pre * 2 + c] = node_next_index;
+                parent[node_next_index] = pre;
                 ++node_next_index;
             }
-            pre = children_index[pre * 2 + c];
+            pre = children[pre * 2 + c];
         }
     }
 }
@@ -160,7 +277,7 @@ int read_record(FILE *fin, int *code, int *nodes, int *words, int &len_code, int
                 assert(buffer[i] == '0' || buffer[i] == '1');
                 code[i] = buffer[i] - '0';
                 nodes[i] = pre;
-                pre = children_index[pre * 2 + buffer[i] - '0'];
+                pre = children[pre * 2 + buffer[i] - '0'];
             }
             len_code = len;
             read_code = 0;
@@ -228,13 +345,13 @@ void dfs_save_code(FILE *fout, int root, char *code, int len) {
         char sep = i == vec_size - 1 ? '\n' : '\t';
         fprintf(fout, "%f%c", syn1[root * vec_size + i], sep);
     }
-    if (children_index[2 * root]) {
+    if (children[2 * root]) {
         code[len] = '0';
-        dfs_save_code(fout, children_index[2 * root], code, len + 1);
+        dfs_save_code(fout, children[2 * root], code, len + 1);
     }
-    if (children_index[2 * root + 1]) {
+    if (children[2 * root + 1]) {
         code[len] = '1';
-        dfs_save_code(fout, children_index[2 * root + 1], code, len + 1);
+        dfs_save_code(fout, children[2 * root + 1], code, len + 1);
     }
 }
 void save_model(FILE *vocab_vec_file, FILE *class_vec_file) {
