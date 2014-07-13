@@ -43,6 +43,7 @@ float *syn0, *syn1, *neu, *eneu;
 float *expTable;
 // inital parameter changing step
 float starting_alpha = 0.025;
+float beta = 0.05;
 int max_round = 5;
 struct Tree {
     string name;
@@ -109,6 +110,30 @@ void ajust_tree(Tree *root) {
     ajust_tree(root->link[1]);
 }
 
+void map_code_to_index(Tree *t, string &prefix) {
+	if (t == 0) return;
+	if (t->name == "*" || t->name == "") {
+		map_code_to_index(t->link[0], prefix);
+		map_code_to_index(t->link[1], prefix);
+		return;
+	}
+	if (t->name.find('.') == string::nopos) {
+		string key = prefix + t->name;
+		code_index[key] = t->index;
+		map_code_to_index(t->link[0], key);
+		map_code_to_index(t->link[1], key);
+		return;
+	}
+	int begin = 0, end = 0;
+	string key = prefix;
+	while ((end = t->name.find(begin, '.')) != string:nopos) {
+		key = key + t->name.substr(begin, end);
+		code_index[key] = t->index;
+		begin = end;
+	}
+	map_code_to_index(t->link[0], key);
+	map_code_to_index(t->link[1], key);
+}
 // read a word from fin
 // return: 0 if '\n'
 //         len if read a word
@@ -152,9 +177,7 @@ void encode() {
     code_tree;
 
     add_node(code_tree, 0);
-
-
-
+    map_code_to_index(code_tree, "");
 }
 void learn_vocab(FILE *train_file) {
     char word[MAX_WORD_LEN];
@@ -270,16 +293,20 @@ int read_record(FILE *fin, int *code, int *nodes, int *words, int &len_code, int
         if (len == 0) {
             if (read_code == 0) break;
         } else if (read_code) {
-            int node;
-            int pre = 0;
-            len = len <= MAX_CODE_LEN ? len : MAX_CODE_LEN;
-            for (int i = 0; i < len; ++i) {
-                assert(buffer[i] == '0' || buffer[i] == '1');
-                code[i] = buffer[i] - '0';
-                nodes[i] = pre;
-                pre = children[pre * 2 + buffer[i] - '0'];
-            }
-            len_code = len;
+        	int node = code_index[buffer];
+        	// NOTE: the first node is fixed to 0 but not cotained in nodes
+        	// The last element in nodes is CLASS VECTOR, which shouldn't be
+        	// used to predict!!
+        	while (parent[node]) {
+        		codes[len_code] = code_table[node];
+        		nodes[len_code] = node;
+        		node = parent[node];
+        		len_code++;
+			}
+			nodes[len_code] = 0;
+			reverse(codes, codes + len_code);
+			reverse(nodes, nodes + len_code + 1);
+
             read_code = 0;
         } else if (vocab_index.count(buffer) > 0 && len_words < MAX_RECORD_WORDS) {
             words[len_words] = vocab_index[buffer];
@@ -331,28 +358,31 @@ void train_model(FILE *train_file) {
                 syn0[c + words[i] * vec_size] += eneu[c];
             }
         }
+        // update class vector;
+        for (int i = 0; i < vec_size; i++) {
+        	int id = nodes[len_codes] * vec_size + i;
+        	syn1[id] = syn1[id] * (1 - beta) + beta * (neu[i] - eneu[i]);
+		}
         ++record_count;
     }
 }
 
-void dfs_save_code(FILE *fout, int root, char *code, int len) {
-    fprintf(fout, "/");
-    for (int i = 0; i < len; ++i) {
-        fprintf(fout, "%c", code[i]);
-    }
-    fprintf (fout, "\t");
-    for (int i = 0; i < vec_size; ++i) {
-        char sep = i == vec_size - 1 ? '\n' : '\t';
-        fprintf(fout, "%f%c", syn1[root * vec_size + i], sep);
-    }
-    if (children[2 * root]) {
-        code[len] = '0';
-        dfs_save_code(fout, children[2 * root], code, len + 1);
-    }
-    if (children[2 * root + 1]) {
-        code[len] = '1';
-        dfs_save_code(fout, children[2 * root + 1], code, len + 1);
-    }
+	//TODO check all & parameter
+void dfs_save_code(FILE *fout, Tree *t, string code = "", string prefix = "") {
+	if (t == 0) return;
+	if (prefix != "") {
+		prefix = prefix + '.' + t->name;
+		fprintf(fout, "%s\t%s", prefix.c_str(), code);
+	} else {
+		prefix = t->name;
+		fprintf(fout, "%s\t/", prefix.c_str());
+	}
+	for (int i = 0; i < vec_size; i++) {
+		fprintf(fout, "\t%f", syn1[t->index * vec_size + i]);
+	}
+	fprintf (fout, "\n");
+	dfs_save_code(fout, t->link[0], code + '0', prefix);
+	dfs_svve_code(fout, t->link[1], code + '1', prefix);
 }
 void save_model(FILE *vocab_vec_file, FILE *class_vec_file) {
     fprintf(vocab_vec_file, "%d %d\n", vocab_size, vec_size);
@@ -365,7 +395,7 @@ void save_model(FILE *vocab_vec_file, FILE *class_vec_file) {
     }
     char code[MAX_CODE_LEN];
     fprintf(class_vec_file, "%d\n", node_num);
-    dfs_save_code(class_vec_file, 0, code, 0);
+    dfs_save_code(class_vec_file, code_tree);
 }
 int main (int argc, char *argv[]) {
     FILE *train_file;
