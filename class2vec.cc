@@ -196,16 +196,16 @@ void learn_vocab(FILE *train_file) {
 
     code_tree = new Tree("*");
     for (set<string>::iterator it = codes.begin(); it != codes.end(); ++it) {
-        int end = 0;
-        int begin = 0;
+        int begin = 0, end;
         Tree *t = code_tree;
-        while (end != it->length()) {
+        while (begin < it->length()) {
+        	end = begin;
             while ((*it)[end] != '.' && end != it->length()){
                 end++;
             }
             string name = it->substr(begin, end - begin);
             t = add_to_tree(t, name); 
-            begin = end;
+            begin = end + 1;
         }
     }
     node_num = ajust_tree(code_tree);
