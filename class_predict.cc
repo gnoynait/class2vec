@@ -77,7 +77,7 @@ void load_nodes(FILE *node_file) {
     int a = 0;
     int node_next_index = 1;
     int node_count = 0;
-    code_name["IGNORE"] == "IGNORE";
+    code_name["IGNORE"] = "IGNORE";
     while ((len = read_word(node_file, buffer)) != -1) {
         if (len == 0) {
             newline = 1;
@@ -100,7 +100,7 @@ void load_nodes(FILE *node_file) {
             int short_len = 0;
             for (int i = 0; i < len; i++) {
                 if (buffer[i] == '*' || buffer[i] == '/') {
-                    if (buffer[short_len - 1] != '.') {
+                    if (short_len > 0 && buffer[short_len - 1] != '.') {
                         buffer[short_len++] = '.';
                     }
                     continue;
