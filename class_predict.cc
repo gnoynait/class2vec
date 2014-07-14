@@ -18,6 +18,7 @@ float *syn0;
 float *syn1;
 int min_record_words = 3;
 map<string, int> vocab_index;
+map<string, string> code_name;
 // read a word from fin
 // return: 0 if '\n'
 //         len if read a word
@@ -76,6 +77,7 @@ void load_nodes(FILE *node_file) {
     int a = 0;
     int node_next_index = 1;
     int node_count = 0;
+    code_name["IGNORE"] == "IGNORE";
     while ((len = read_word(node_file, buffer)) != -1) {
         if (len == 0) {
             newline = 1;
@@ -93,6 +95,20 @@ void load_nodes(FILE *node_file) {
                     index = children[index * 2 + c];
                 }
             }
+            string key = buffer;
+            len = read_word(node_file, buffer);
+            int short_len = 0;
+            for (int i = 0; i < len; i++) {
+                if (buffer[i] == '*' || buffer[i] == '/') {
+                    if (buffer[short_len - 1] != '.') {
+                        buffer[short_len++] = '.';
+                    }
+                    continue;
+                }
+                buffer[short_len++] = buffer[i];
+            }
+            buffer[short_len] = '\0';
+            code_name[key] = buffer;
             a = 0;
             newline = 0;
         } else {
@@ -117,6 +133,7 @@ void predict(int *words, int len, char *code) {
             neu[j] += syn0[words[i] * vec_size + j];
         }
     }
+    code[level++] = '/';
     while (1) {
         float f = 0;
         for (int i = 0; i < vec_size; ++i) {
@@ -129,7 +146,7 @@ void predict(int *words, int len, char *code) {
             code[level++] = '0';
             node = children[node * 2];
         }
-        if (node == 0) break;
+        if (children[node * 2] == 0) break;
     }
     code[level] = '\0';
 }
@@ -148,7 +165,7 @@ void process(FILE *target_file, FILE *result_file) {
                 words[len_record++] = vocab_index[buffer];
         } else if (len == 0) {
             predict(words, len_record, code);
-            fprintf (result_file, "%s\n", code);
+            fprintf (result_file, "%s\n", code_name[code].c_str());
             len_record = 0;
         } else {
             break;
