@@ -60,21 +60,25 @@ float cosine (float *vec1, float *vec2) {
 void update_words() {
    for (int w = 0; w < vocab_size; ++w) {
        for (int t = 0; t < topic_num; ++t) {
-           update(W+ w * vec_size, T + t * vec_size, alpha * Ww[w * topic_num + t]);
+       	   float b = exp(product(T + t * vec_size, W + w * vec_size));
+           update(W+ w * vec_size, T + t * vec_size, alpha * b * Ww[w * topic_num + t]);
        }
-       normalize(W + w *vec_size);
+       //normalize(W + w *vec_size);
    }
 }
 void update_topic() {
     for (int t = 0; t < topic_num; ++t) {
         for (int w = 0; w < vocab_size; ++w) {
-            update(T + t * vec_size, W + w * vec_size, alpha * Wt[t * vocab_size + w]);
+        	float b = exp(product(T + t * vec_size, W + w * vec_size));
+            update(T + t * vec_size, W + w * vec_size, alpha * b * Wt[t * vocab_size + w]);
         }
-        normalize(T + t * vec_size);
+        //normalize(T + t * vec_size);
         for (int p = 0; p < topic_num; ++p) {
-            update(T + t * vec_size, T + t * vec_size, alpha * lambda);
+        	if (p == t) continue;
+        	float b = exp(product(T + t * vec_size, T + p * vec_size));
+            update(T + t * vec_size, T + t * vec_size, alpha * lambda * b);
         }
-        normalize(T + t * vec_size);
+        //normalize(T + t * vec_size);
     }
 }
 
@@ -104,7 +108,7 @@ void test() {
 		for (int j = 0; j < vec_size; j++) {
 			T[i * vec_size + j] = rand() * 1.0 / RAND_MAX;
 		}
-		normalize(T + i * vec_size);
+		//normalize(T + i * vec_size);
 	}
 	alpha = 0.025;
 	max_round = 10000000;
@@ -113,13 +117,14 @@ void test() {
 		for (int i = 0; i < topic_num; i++) {
 			for (int j = 0; j < topic_num; j++) {	
 				if (i == j) continue;
-				if (product(T + i * vec_size, T + j * vec_size) < 0) continue;
+				float p = product(T + i * vec_size, T + j * vec_size);
+				p = exp(p);
 				float rate = alpha * (1 - round / (float)100000);
 				rate = rate < 0.00001 ? 0.00001 : rate;
-				rate = -rate;
+				rate = -rate * p;
 				update(T + i * vec_size, T + j * vec_size, rate);
 			}
-			normalize(T + i * vec_size);
+			//normalize(T + i * vec_size);
 		}
 	}
 	float P = 0;
@@ -133,6 +138,9 @@ void test() {
 		cout << endl;
 	}
 	cout << P << endl;
+	for (int i = 0; i < topic_num; i++) {
+		cout << sqrt(product(T + vec_size * i, T + vec_size * i)) << endl;
+	}
 }
 
 int main(int argc, char *argv[]) {
