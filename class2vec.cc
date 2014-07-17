@@ -281,48 +281,53 @@ void train_model(FILE *train_file) {
     int len_code, len_words;
     int record_count = 0;
     float alpha;
-    fseek(train_file, 0, SEEK_SET);
-    while (read_record(train_file, code, nodes, words, len_code, len_words )) {
-        if (len_words < min_record_words) continue;
-        //cerr << record_count << endl;
-        alpha = starting_alpha * (1 - record_count / (float)100000);
-        if (alpha < starting_alpha * 0.0001) alpha = starting_alpha * 0.0001;
-        for (int i = 0; i < vec_size; ++i) {
-            neu[i] = 0;
-            eneu[i] = 0;
-        }
-        for (int i = 0; i < len_words; ++i) {
-            for (int j = 0; j < vec_size; ++j) {
-                neu[j] += syn0[words[i] * vec_size + j];
-            }
-        }
-        for (int i = 0; i < len_code; ++i) {
-            float f = 0;
-            float g;
-            for (int j = 0; j < vec_size; ++j) {
-                f += neu[j] * syn1[nodes[i] * vec_size + j];
-            }
-            if (f <= -MAX_EXP) continue;
-            else if (f >= MAX_EXP) continue;
-            else f = expTable[(int)((f + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))];
-            g = (1 - code[i] - f) * alpha;
-            for (int c = 0; c < vec_size; ++c) {
-                eneu[c] += g * syn1[nodes[i] * vec_size + c];
-                syn1[nodes[i] * vec_size + c] += g * neu[c];
-            }
-        }
-        for (int i = 0; i < len_words; i++) {
-            for (int c = 0; c < vec_size; c++) {
-                syn0[c + words[i] * vec_size] += eneu[c];
-            }
-        }
-        // update class vector;
-        for (int i = 0; i < vec_size; i++) {
-        	int id = nodes[len_code] * vec_size + i;
-        	syn1[id] = syn1[id] * (1 - beta) + beta * (neu[i] - eneu[i]);
+    int round = 0;
+	while (round < max_round) {
+		fprintf(stderr, "round %d/%d\n", round + 1, max_round);
+		fseek(train_file, 0, SEEK_SET);
+		while (read_record(train_file, code, nodes, words, len_code, len_words )) {
+			if (len_words < min_record_words) continue;
+			//cerr << record_count << endl;
+			alpha = starting_alpha * (1 - record_count / (float)100000);
+			if (alpha < starting_alpha * 0.0001) alpha = starting_alpha * 0.0001;
+			for (int i = 0; i < vec_size; ++i) {
+				neu[i] = 0;
+				eneu[i] = 0;
+			}
+			for (int i = 0; i < len_words; ++i) {
+				for (int j = 0; j < vec_size; ++j) {
+					neu[j] += syn0[words[i] * vec_size + j];
+				}
+			}
+			for (int i = 0; i < len_code; ++i) {
+				float f = 0;
+				float g;
+				for (int j = 0; j < vec_size; ++j) {
+					f += neu[j] * syn1[nodes[i] * vec_size + j];
+				}
+				if (f <= -MAX_EXP) continue;
+				else if (f >= MAX_EXP) continue;
+				else f = expTable[(int)((f + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))];
+				g = (1 - code[i] - f) * alpha;
+				for (int c = 0; c < vec_size; ++c) {
+					eneu[c] += g * syn1[nodes[i] * vec_size + c];
+					syn1[nodes[i] * vec_size + c] += g * neu[c];
+				}
+			}
+			for (int i = 0; i < len_words; i++) {
+				for (int c = 0; c < vec_size; c++) {
+					syn0[c + words[i] * vec_size] += eneu[c];
+				}
+			}
+			// update class vector;
+			for (int i = 0; i < vec_size; i++) {
+				int id = nodes[len_code] * vec_size + i;
+				syn1[id] = syn1[id] * (1 - beta) + beta * (neu[i] - eneu[i]);
+			}
+			++record_count;
 		}
-        ++record_count;
-    }
+		round++;
+	}
 }
 
 void dfs_save_code(FILE *fout, Tree *t, string code = "/", string prefix = "") {
@@ -376,10 +381,8 @@ int main (int argc, char *argv[]) {
     learn_vocab(train_file);
     fprintf(stderr, "vocab size:\t%d\n", vocab_size);
     init_net();
-    for (int i = 0; i < max_round; ++i) {
-        fprintf(stderr, "start round %d/%d\n", i + 1, max_round);
-        train_model(train_file);
-    }
+
+	train_model(train_file);
     
     fprintf(stderr, "saving model\n");
     save_model(vocab_vec_file, class_vec_file);
