@@ -119,7 +119,7 @@ void train() {
         alpha = alpha < 0.0001 ? 0.0001 : alpha;
 
         float A = 0;
-        for (int w = 0; w < words.size(); i++) {
+        for (int w = 0; w < words.size(); w++) {
             for (int c = 0; c < class_num; c++) {
                 float a = expprod(word_vec[words[w]], class_vec[c]);
                 expprod_table[w][c] = a;
@@ -138,18 +138,18 @@ void train() {
             for (int c = 0; c < class_num; c++) {
                 update(vec, class_vec[c], - s * expprod_table[w][c]);
             }
-            update(word_vec[w], vec, alpha / A / A);
+            update(word_vec[words[w]], vec, alpha / A / A);
         }
 
         for (int c = 0; c < class_num; c++) {
             clear_vec(vec);
             if (c == class_id) {
                 for (w = 0; w < words.size(); w++) {
-                    update(vec, word_vec[w], A * expprod_table[w][c]); 
+                    update(vec, word_vec[words[w]], A * expprod_table[w][c]); 
                 }
             }
             for (w = 0; w < words.size(); w++) {
-                update(vec, words[w], - A * expprod_table[w][c]);
+                update(vec, word_vec[words[w]], - s * expprod_table[w][c]);
             }
             update(class_vec[c], vec, alpha / A / A);
         }
