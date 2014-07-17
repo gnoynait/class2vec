@@ -7,7 +7,11 @@ with open('result.dat', 'r') as f:
     for line in f:
         result.append(line.strip())
 count = 0
+ig = 0
 for a, r in zip(answer, result):
-    if a == r or r == 'IGNORE':
+    if r == 'IGNORE':
+        ig += 1
+        continue
+    if a == r:
         count += 1
-print count * 1.0 / len(answer)
+print count * 1.0 / (len(answer) - ig)
