@@ -117,7 +117,7 @@ int get_instance(vector<int> &words) {
 
 int predict(vector<int> &words) {
     float maxv = 0;
-    int result = 0;
+    int result = -1;
     for (int c = 0; c < class_num; c++) {
         float v = 0;
         for (int w = 0; w < words.size(); w++) {

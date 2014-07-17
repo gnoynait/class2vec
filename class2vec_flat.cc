@@ -19,7 +19,7 @@ int class_num;
 // maximum words in a record, remaining words will be ignored
 int max_record_words = 100;
 // minimum words in a record, record has fewer words will be ignored
-int min_record_words = 3;
+int min_record_words = 1;
 // minimum apperance of a word, words appeared fewer than this will be ignored
 int min_word_count = 20;
 // how many times to go through th train file
@@ -115,7 +115,7 @@ int read_record(vector<string> &record) {
 
 // learn vocabulary and classes from the train file
 void learn_vocab() {
-    train_file.seekg(0, train_file.beg);
+    train_file.seekg(0, ios::beg);
     vector<string> record;
     class_num = 0;
     word_num = 0;
@@ -157,29 +157,32 @@ void train() {
     int round = 0;
     int record_count = 0;
     int round_records = 0;
+	int class_id;
+	float alpha;
+	vector<int> words;
     // expprod_table[w][c] = exp(word_vec[w] * class_vec[c])
     vector<vector<float> > expprod_table(max_record_words,
         vector<float>(class_num, 0));
     // update buffer
     float *vec = new float[vec_size];
     assert(vec);
-    train_file.seekg(0, train_file.beg);
+    train_file.clear();
+    train_file.seekg(0, ios::beg);
+    cerr << "cur " << train_file.tellg() << endl;
     while (round < max_round) {
-        int class_id;
-        vector<int> words;
-
         if (get_instance(class_id, words) == 0) {
             round++;
-            cerr << round << ' ' << round_records << endl;
+            cerr << round << ' ' << round_records << ' ' << alpha << endl;
             round_records = 0;
-            train_file.seekg(0, train_file.beg);
+            train_file.clear();
+            train_file.seekg(0, ios::beg);
             continue;
         }
         round_records++;
 
         if (words.size() < min_record_words) continue;
 
-        float alpha = start_alpha * (1 - (float)record_count / 100000);
+        alpha = start_alpha * (1 - (float)record_count / 100000);
         if (record_count < 100000) {
             record_count++;
         }
