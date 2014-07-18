@@ -62,6 +62,19 @@ void update(float *vec1, float *vec2, float rate) {
     }
 }
 
+void normalize(float *vec) {
+    float s = 0;
+    for (int i = 0; i < vec_size; i++) {
+        s += vec[i] * vec[i];
+    }
+    s = sqrt(s);
+    if (s == 0) return;
+    for (int i = 0; i < vec_size; i++) {
+        vec[i] /= s;
+    }
+}
+
+
 // allocate memory for word_vec and class_vec and give 
 // them random initial value
 void init_net() {
@@ -79,6 +92,7 @@ void init_net() {
         for (int j = 0; j < vec_size; j++) {
             word_vec[i][j] = 2.0 * ((float) rand() / RAND_MAX - 0.5);
         }
+        normalize(word_vec[i]);
     }
     for (int i = 0; i < class_num; i++) {
         class_vec[i] = new float[vec_size];
@@ -86,6 +100,7 @@ void init_net() {
         for (int j = 0; j < vec_size; j++) {
             class_vec[i][j] = 2.0 * ((float) rand() / RAND_MAX - 0.5);
         }
+        normalize(class_vec[i]);
     }
 }
 
@@ -236,9 +251,11 @@ void train() {
 		float update_rate = alpha / (A * A);
 		for (int w = 0; w < words.size(); w++) {
 			update(word_vec[words[w]], deta_w[w], update_rate);
+            normalize(word_vec[words[w]]);
 		}
 		for (int c = 0; c < class_num; c++) {
 			update(class_vec[c], deta_c[c], update_rate);
+            normalize(class_vec[c]);
 		}
     }
 }
