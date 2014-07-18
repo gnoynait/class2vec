@@ -163,9 +163,18 @@ void train() {
     // expprod_table[w][c] = exp(word_vec[w] * class_vec[c])
     vector<vector<float> > expprod_table(max_record_words,
         vector<float>(class_num, 0));
-    // update buffer
-    float *vec = new float[vec_size];
-    assert(vec);
+    float **deta_w = new float*[max_record_words];
+    assert(deta_w);
+    for (int i = 0; i < max_record_words; i++) {
+    	deta_w[i] = new float[vec_size];
+    	assert(deta_w[i]);
+	}
+	float **deta_c = new float *[class_num];
+	assert(deta_c);
+	for (int i = 0; i < class_num; i++) {
+		deta_c[i] = new float[vec_size];
+		assert(deta_c);
+	}
     train_file.clear();
     train_file.seekg(0, ios::beg);
     cerr << "cur " << train_file.tellg() << endl;
@@ -186,7 +195,7 @@ void train() {
         if (record_count < 100000) {
             record_count++;
         }
-        alpha = alpha < 0.0001 ? 0.0001 : alpha;
+        alpha = alpha < 0.0001 * start_alpha ? 0.0001 * start_alpha : alpha;
 
         float A = 0;
         for (int w = 0; w < words.size(); w++) {
@@ -203,26 +212,34 @@ void train() {
         }
 
         for (int w = 0; w < words.size(); w++) {
-            clear_vec(vec);
-            update(vec, class_vec[class_id], A * expprod_table[w][class_id]);
+            clear_vec(deta_w[w]);
+            update(deta_w[w], class_vec[class_id], A * expprod_table[w][class_id]);
             for (int c = 0; c < class_num; c++) {
-                update(vec, class_vec[c], - s * expprod_table[w][c]);
+                update(deta_w[w], class_vec[c], - s * expprod_table[w][c]);
             }
-            update(word_vec[words[w]], vec, alpha / A / A);
+            
         }
 
         for (int c = 0; c < class_num; c++) {
-            clear_vec(vec);
+            clear_vec(deta_c[c]);
             if (c == class_id) {
                 for (int w = 0; w < words.size(); w++) {
-                    update(vec, word_vec[words[w]], A * expprod_table[w][c]); 
+                    update(deta_c[c], word_vec[words[w]], A * expprod_table[w][c]); 
                 }
             }
             for (int w = 0; w < words.size(); w++) {
-                update(vec, word_vec[words[w]], - s * expprod_table[w][c]);
+                update(deta_c[c], word_vec[words[w]], - s * expprod_table[w][c]);
             }
-            update(class_vec[c], vec, alpha / A / A);
         }
+
+
+		float update_rate = alpha / (A * A);
+		for (int w = 0; w < words.size(); w++) {
+			update(word_vec[words[w]], deta_w[w], update_rate);
+		}
+		for (int c = 0; c < class_num; c++) {
+			update(class_vec[c], deta_c[c], update_rate);
+		}
     }
 }
 

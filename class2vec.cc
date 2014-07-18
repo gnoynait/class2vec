@@ -44,7 +44,7 @@ float *syn0, *syn1, *neu, *eneu;
 // for fast compute 1/(1 + exp(x))
 float *expTable;
 // inital parameter changing step
-float starting_alpha = 0.025;
+float starting_alpha = 0.0025;
 float beta = 0.05;
 int max_round = 5;
 struct Tree {
@@ -288,7 +288,7 @@ void train_model(FILE *train_file) {
 		while (read_record(train_file, code, nodes, words, len_code, len_words )) {
 			if (len_words < min_record_words) continue;
 			//cerr << record_count << endl;
-			alpha = starting_alpha * (1 - record_count / (float)100000);
+			alpha = starting_alpha * (1 - record_count / (float)(vocab_size + 1));
 			if (alpha < starting_alpha * 0.0001) alpha = starting_alpha * 0.0001;
 			for (int i = 0; i < vec_size; ++i) {
 				neu[i] = 0;
