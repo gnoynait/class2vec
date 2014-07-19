@@ -26,7 +26,7 @@ int min_word_count = 20;
 // how many times to go through th train file
 int max_round = 2;
 // initial update rate
-float alpha = 0.1;
+float alpha = 0.001;
 
 float **word_vec;
 float **class_vec;
@@ -44,9 +44,17 @@ ofstream class_vec_file;
 float expprod(float *vec1, float *vec2) {
     float p = 0;
     for (int i = 0; i < vec_size; i++) {
+    // TODO
+/*  
+        printf("%fx%f\n", vec1[i], vec2[i]);    
+          assert(!isnan(p));
         p += vec1[i] * vec2[i];
+    */
     }
-    return exp(p);
+    float t = exp(p);
+    if (t > 400.0) return 400.0;
+    if (t < -400.0) return -400.0;
+    return t;
 }
 
 // set vec = 0
@@ -223,6 +231,7 @@ void train() {
 			expprod_table[c] = expprod(ws, class_vec[c]);
 			s += expprod_table[c];
 		}
+        if (s > 20) continue;
 		assert(!isnan(s));
 		float a = expprod_table[class_id];
 
