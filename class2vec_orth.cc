@@ -243,8 +243,9 @@ void train() {
             float p = product(class_vec[c], ws);
 			if (c == class_id) {
                 update_vec(class_vec[c], ws, alpha * lambda * (1 - p));
+                normalize(class_vec[c]);
 			} else {
-                update_vec(class_vec[c], ws, - alpha * p);
+                //update_vec(class_vec[c], ws, - alpha * p);
             }
 		}
     }

@@ -45,7 +45,7 @@ float *weight;
 // for fast compute 1/(1 + exp(x))
 float *expTable;
 // inital parameter changing step
-float starting_alpha = 0.0025;
+float starting_alpha = 0.025;
 float beta = 0.05;
 int max_round = 5;
 struct Tree {
@@ -291,8 +291,8 @@ void train_model(FILE *train_file) {
 		while (read_record(train_file, code, nodes, words, len_code, len_words )) {
 			if (len_words < min_record_words) continue;
 			//cerr << record_count << endl;
-			alpha = starting_alpha * (1 - record_count / (float)(vocab_size + 1));
-			if (alpha < starting_alpha * 0.001) alpha = starting_alpha * 0.001;
+			alpha = starting_alpha * (1 - record_count / 10000);
+			if (alpha < starting_alpha * 0.01) alpha = starting_alpha * 0.01;
 			for (int i = 0; i < vec_size; ++i) {
 				neu[i] = 0;
 				eneu[i] = 0;
@@ -314,17 +314,18 @@ void train_model(FILE *train_file) {
 					else f = expTable[(int)((f + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))];
 					
 					
-					g = 100000 *  (1 - code[i] - f) * alpha;
+					g = 10000 *  (1 - code[i] - f) * alpha;
 
-					printf ("%f\n",  alpha);
+					//printf ("%f\n",  alpha);
 					for (int w = 0; w < len_words; w++) {
-						if (weight[words[w]] > 10  || weight[words[w]] < 0.001) {
-							printf ("%f, continue\n", weight[words[w]]);
-							continue;
-						}
 						for (int j = 0; j < vec_size; j++) {
-							weight[words[w]] -= syn1[nodes[i] * vec_size + j] * syn0[words[w] * vec_size + j] * g;
+							weight[words[w]] += syn1[nodes[i] * vec_size + j] * syn0[words[w] * vec_size + j] * g;
 						}
+						if (weight[words[w]] > 20) {
+                            weight[words[w]] = 10;
+                        } else if (weight[words[w]] < 0.0001) {
+                            weight[words[w]] = 0.001;
+                        }
 					}
 				}
 			} else {
@@ -340,7 +341,7 @@ void train_model(FILE *train_file) {
 					g = (1 - code[i] - f) * alpha;
 					for (int c = 0; c < vec_size; ++c) {
 						eneu[c] += g * syn1[nodes[i] * vec_size + c];
-						syn1[nodes[i] * vec_size + c] += g * neu[c];
+						syn1[nodes[i] * vec_size + c] += 0.01 * g * neu[c];
 					}
 				}
 				for (int i = 0; i < len_words; i++) {
@@ -380,7 +381,7 @@ void save_model(FILE *vocab_vec_file, FILE *class_vec_file) {
     fprintf(vocab_vec_file, "%d %d\n", vocab_size, vec_size);
     for (map<string, int>::iterator it = vocab_index.begin(); it != vocab_index.end(); ++it) {
         fprintf (vocab_vec_file, "%s\t", it->first.c_str());
-        printf ("%s\t%f\n", it->first.c_str(), weight[it->second]);
+        printf ("%f\t%s\n", weight[it->second], it->first.c_str());
         for (int i = 0; i < vec_size; ++i) {
             char sep = i == vec_size - 1 ? '\n' : '\t';
             fprintf(vocab_vec_file, "%f%c", weight[it->second] * syn0[it->second * vec_size + i], sep);
